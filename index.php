@@ -40,7 +40,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $page === 'login') {
     }
 }
 
-// Incluye header y navbar
+// Incluye header y navbars
 include __DIR__ . '/views/layouts/header.php';
 include __DIR__ . '/views/layouts/navbar.php';
 
