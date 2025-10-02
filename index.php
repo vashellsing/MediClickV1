@@ -7,6 +7,7 @@ if (session_status() === PHP_SESSION_NONE) {
 $page = $_GET['page'] ?? 'login';
 
 // ayuda a cerrar sesion
+// Si la página es 'logout', destruye la sesión y redirige al login
 if ($page === 'logout') {
     // Limpia variables de sesión
     $_SESSION = [];
