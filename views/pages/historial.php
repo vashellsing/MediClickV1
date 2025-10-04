@@ -23,11 +23,13 @@ if (!isset($_SESSION['usuario'])) {
     </tr>
   </thead>
   <tbody>
+ 
+
   <tr>
-    <td>5/10/2025</td>
-    <td>Especializacion</td>
+    <td>30/10/2025</td>
+    <td>General</td>
     <td>Dra.Maria Lopez</td>
-    <td>3:00</td>
+    <td>15:00</td>
     <td class="bg-primary text blark">Agendado</td>
     <td>
       <a href="index.php?page=agenda_general" class="btn btn-primary btn-sm reprogramar-btn">Reprogramar</a> 
@@ -36,10 +38,10 @@ if (!isset($_SESSION['usuario'])) {
   </tr>
 
   <tr>
-    <td>5/10/2025</td>
-    <td>Especializacion</td>
-    <td>Dra.Maria Lopez</td>
-    <td>3:00</td>
+    <td>30/10/2025</td>
+    <td>Especialización</td>
+    <td>Dra.Juana Campos</td>
+    <td>16:00 </td>
     <td class="bg-primary text blark">Agendado</td>
     <td>
       <a href="index.php?page=agenda_general" class="btn btn-primary btn-sm reprogramar-btn">Reprogramar</a> 
@@ -51,12 +53,9 @@ if (!isset($_SESSION['usuario'])) {
   <td>15/10/2025</td>
   <td>General</td>
   <td>Dra.Maria Lopez</td>
-  <td>3:00</td>
+  <td>15:00</td>
   <td class="bg-info text-blark">Reprogramada</td>
-  <td>
-    <a href="index.php?page=agenda_general" class="btn btn-primary btn-sm reprogramar-btn">Reprogramar</a> 
-    <button class="btn btn-danger btn-sm cancelar-btn">Cancelar</button>
-  </td>
+
 </tr>
 
   <tr>
