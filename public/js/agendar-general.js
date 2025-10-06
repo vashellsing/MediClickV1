@@ -1,23 +1,8 @@
-/* public/js/agendar-general.js
-   Lógica del calendario, médicos y horarios (front-end only, simulación).
-*/
+// public/js/agendar-general.js
+document.addEventListener('DOMContentLoaded', () => {
+  console.log('agendar-general.js cargado');
 
-(function () {
-  // ---------- Datos de ejemplo ----------
-  const doctors = [
-    { id: 1, name: 'Dra. María López', speciality: 'Medicina General', avatar: '' },
-    { id: 2, name: 'Dr. Carlos Ramírez', speciality: 'Pediatría', avatar: '' },
-    { id: 3, name: 'Dra. Ana Torres', speciality: 'Ginecología', avatar: '' },
-    { id: 4, name: 'Dr. Felipe Gómez', speciality: 'Ortopedia', avatar: '' },
-  ];
-
-  // estado
-  let currentMonth = new Date(); // fecha utilizada para el calendario
-  let selectedDate = null;       // Date object
-  let selectedDoctorId = null;   // number | null
-  let selectedSlot = null;       // string 'HH:MM'
-
-  // referencias al DOM
+  // ----- referencias DOM (deben coincidir con tu HTML) -----
   const calendarGrid = document.getElementById('calendarGrid');
   const currentMonthLabel = document.getElementById('currentMonth');
   const prevMonthBtn = document.getElementById('prevMonth');
@@ -40,280 +25,263 @@
   const confirmDateInput = document.getElementById('confirmDate');
   const confirmDoctorIdInput = document.getElementById('confirmDoctorId');
 
-  // util: formatea fecha
-  function formatDate(date) {
-    const dd = String(date.getDate()).padStart(2, '0');
-    const mm = String(date.getMonth() + 1).padStart(2, '0');
-    const yyyy = date.getFullYear();
-    return `${yyyy}-${mm}-${dd}`;
+  // ----- estado -----
+  let selectedDate = null;      // Date object
+  let selectedDoctorId = null;  // number
+  let selectedSlot = null;      // "HH:MM"
+
+  // ----- datos de ejemplo (médicos) -----
+  const doctors = [
+    { id: 1, name: 'Dra. Laura Méndez', speciality: 'Medicina general' },
+    { id: 2, name: 'Dr. Carlos Ruiz', speciality: 'Pediatría' },
+    { id: 3, name: 'Dra. Natalia Gómez', speciality: 'Ginecología' },
+    { id: 4, name: 'Dr. Andrés Pérez', speciality: 'Ortopedia' }
+  ];
+
+  // ==== utilidades ====
+  function pad2(n){ return String(n).padStart(2,'0'); }
+  function formatDateISO(d){
+    return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;
   }
 
-  function formatDisplayDate(date) {
-    return date.toLocaleDateString(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
+  // Determinista: marca algunos slots como ocupados según fecha+doctor+slot
+  function isOccupiedDeterministic(dateISO, doctorId, totalMins){
+    const key = `${dateISO}|${doctorId ?? 'any'}|${totalMins}`;
+    let sum = 0;
+    for (let i=0;i<key.length;i++) sum = (sum + key.charCodeAt(i) * (i+1)) % 97;
+    // Aprox ~1/4 ocupados
+    return (sum % 4) === 0;
   }
 
-  // ---------- Calendario ----------
-  function renderCalendar(date) {
-    // fecha al primer día del mes
-    const year = date.getFullYear();
-    const month = date.getMonth();
-    const firstDay = new Date(year, month, 1);
-    const lastDay = new Date(year, month + 1, 0);
-    // weekday Monday as first column: JS getDay() returns 0=Sun..6=Sat
-    // convert so that Monday=0..Sunday=6
-    const offset = (firstDay.getDay() + 6) % 7;
+  // ==== calendario ====
+  let today = new Date();
+  let currentMonth = new Date(today.getFullYear(), today.getMonth(), 1);
 
-    currentMonthLabel.textContent = date.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+function renderCalendar(date) {
+  calendarGrid.innerHTML = '';
+  const year = date.getFullYear();
+  const month = date.getMonth();
+  const firstDay = new Date(year, month, 1);
+  const lastDate = new Date(year, month + 1, 0).getDate();
 
-    calendarGrid.innerHTML = '';
+  currentMonthLabel.textContent = date.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
 
-    // fill blanks
-    for (let i = 0; i < offset; i++) {
-      const empty = document.createElement('div');
-      empty.className = 'col border rounded bg-light text-center py-3';
-      empty.innerHTML = '&nbsp;';
-      calendarGrid.appendChild(empty);
-    }
+  const startOffset = (firstDay.getDay() + 6) % 7; // lunes = 0
+  const totalCells = startOffset + lastDate;
+  const rows = Math.ceil(totalCells / 7);
 
-    for (let d = 1; d <= lastDay.getDate(); d++) {
-      const cellDate = new Date(year, month, d);
-      const cell = document.createElement('div');
-      cell.className = 'col border rounded text-center py-2 day-cell';
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'btn btn-sm btn-outline-secondary w-100';
-      btn.textContent = d;
-      btn.dataset.date = formatDate(cellDate);
+  const grid = document.createElement('div');
+  grid.className = 'calendar-grid d-grid gap-2';
+  grid.style.gridTemplateColumns = 'repeat(7, 1fr)';
 
-      // marca el día hoy
-      const today = new Date();
-      if (cellDate.toDateString() === today.toDateString()) {
-        btn.classList.add('fw-bold');
-      }
-
-      btn.addEventListener('click', () => {
-        // selecciona día
-        selectedDate = cellDate;
-        // marca visual
-        document.querySelectorAll('.day-cell button').forEach(b => b.classList.remove('btn-primary'));
-        btn.classList.remove('btn-outline-secondary');
-        btn.classList.add('btn-primary');
-        // renderiza horarios para ese día
-        renderSchedule();
-      });
-
-      cell.appendChild(btn);
-      calendarGrid.appendChild(cell);
-    }
-
-    // si ya había seleccionado una fecha y está en el mes actual, re-marcarla
-    if (selectedDate && selectedDate.getMonth() === month && selectedDate.getFullYear() === year) {
-      const sel = calendarGrid.querySelector(`button[data-date="${formatDate(selectedDate)}"]`);
-      if (sel) {
-        sel.classList.remove('btn-outline-secondary');
-        sel.classList.add('btn-primary');
-      }
-    }
+  // celdas vacías antes del primer día
+  for (let i = 0; i < startOffset; i++) {
+    const empty = document.createElement('div');
+    grid.appendChild(empty);
   }
+
+  // días del mes
+  for (let d = 1; d <= lastDate; d++) {
+    const cellDate = new Date(year, month, d);
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn btn-outline-secondary w-100 py-2';
+    btn.textContent = d;
+    btn.dataset.date = formatDateISO(cellDate);
+
+    // marcar hoy
+    if (cellDate.toDateString() === today.toDateString()) {
+      btn.classList.add('fw-bold', 'border-primary');
+    }
+
+    // al hacer clic
+    btn.addEventListener('click', () => {
+      selectedDate = cellDate;
+      grid.querySelectorAll('button').forEach(b => b.classList.remove('btn-primary', 'text-white'));
+      btn.classList.add('btn-primary', 'text-white');
+      selectedSlot = null;
+      renderSchedule();
+    });
+
+    grid.appendChild(btn);
+  }
+
+  // completar hasta múltiplo de 7
+  while (grid.children.length % 7 !== 0) {
+    const filler = document.createElement('div');
+    grid.appendChild(filler);
+  }
+
+  calendarGrid.appendChild(grid);
+
+  // mantener resaltado si ya hay día seleccionado
+  if (selectedDate && selectedDate.getFullYear() === year && selectedDate.getMonth() === month) {
+    const selBtn = calendarGrid.querySelector(`button[data-date="${formatDateISO(selectedDate)}"]`);
+    if (selBtn) selBtn.classList.add('btn-primary', 'text-white');
+  }
+}
 
   prevMonthBtn?.addEventListener('click', () => {
     currentMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1);
     renderCalendar(currentMonth);
   });
-
   nextMonthBtn?.addEventListener('click', () => {
     currentMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1);
     renderCalendar(currentMonth);
   });
 
-  // ---------- Doctores ----------
-  function renderDoctors(filter = '') {
+  // ==== doctores ====
+  function renderDoctors(filter = ''){
     doctorListEl.innerHTML = '';
-    const normalizedFilter = filter.trim().toLowerCase();
-    const filtered = doctors.filter(d => d.name.toLowerCase().includes(normalizedFilter) || d.speciality.toLowerCase().includes(normalizedFilter));
+    const q = (filter||'').trim().toLowerCase();
+    const filtered = doctors.filter(d => d.name.toLowerCase().includes(q) || d.speciality.toLowerCase().includes(q));
 
-    filtered.forEach(d => {
-      const item = document.createElement('button');
-      item.type = 'button';
-      item.className = 'list-group-item list-group-item-action d-flex justify-content-between align-items-start';
-      item.dataset.doctorId = d.id;
-      item.innerHTML = `<div>
-                          <strong>${d.name}</strong><div class="small text-muted">${d.speciality}</div>
-                        </div>
-                        <div class="small text-muted">ID ${d.id}</div>`;
-
-      item.addEventListener('click', () => {
-        selectedDoctorId = d.id;
-        // visual
-        doctorListEl.querySelectorAll('.list-group-item').forEach(n => n.classList.remove('active'));
-        item.classList.add('active');
-        // render horarios según doctor
-        renderSchedule();
-      });
-
-      doctorListEl.appendChild(item);
-    });
-
-    if (filtered.length === 0) {
-      const li = document.createElement('div');
-      li.className = 'text-muted small';
-      li.textContent = 'No se encontraron médicos.';
-      doctorListEl.appendChild(li);
-    }
-  }
-
-  btnDoctorSearch?.addEventListener('click', () => {
-    renderDoctors(doctorSearchInput.value);
-  });
-
-  doctorSearchInput?.addEventListener('keyup', (e) => {
-    if (e.key === 'Enter') renderDoctors(doctorSearchInput.value);
-  });
-
-  omitDoctorBtn?.addEventListener('click', () => {
-    selectedDoctorId = null;
-    // remover selección visual
-    doctorListEl.querySelectorAll('.list-group-item').forEach(n => n.classList.remove('active'));
-    renderSchedule();
-  });
-
-  // ---------- Horarios ----------
-  // Genera horarios: start 09:00 end 17:00 cada 30 minutos
-  function generateSlots() {
-    const slots = [];
-    for (let h = 9; h < 17; h++) {
-      slots.push(`${String(h).padStart(2, '0')}:00`);
-      slots.push(`${String(h).padStart(2, '0')}:30`);
-    }
-    // incluir 17:00 como última hora
-    slots.push('17:00');
-    return slots;
-  }
-
-  // pequeña función determinista para marcar algunos horarios como ocupados
-  function isOccupied(dateStr, doctorId, slot) {
-    // usa suma de códigos para pseudo-aleatoriedad determinista
-    const key = `${dateStr}|${doctorId ?? 'any'}|${slot}`;
-    let sum = 0;
-    for (let i = 0; i < key.length; i++) sum = (sum + key.charCodeAt(i)) % 97;
-    // marca ocupado si sum % 5 == 0 (aprox 1/5 de slots ocupados)
-    return (sum % 5) === 0;
-  }
-
-  function renderSchedule() {
-    scheduleGrid.innerHTML = '';
-
-    if (!selectedDate) {
-      scheduleGrid.innerHTML = '<div class="text-muted small">Seleccione primero una fecha en el calendario.</div>';
+    if (filtered.length === 0){
+      const no = document.createElement('div');
+      no.className = 'text-muted small';
+      no.textContent = 'No se encontraron médicos.';
+      doctorListEl.appendChild(no);
       return;
     }
 
-    const dateStr = formatDate(selectedDate);
-    const slots = generateSlots();
-
-    slots.forEach(slot => {
-      const occupied = isOccupied(dateStr, selectedDoctorId, slot);
+    filtered.forEach(d => {
       const btn = document.createElement('button');
       btn.type = 'button';
-      btn.className = 'btn btn-sm';
-      btn.style.minWidth = '90px';
-      btn.textContent = slot;
+      btn.className = 'list-group-item list-group-item-action d-flex justify-content-between align-items-start';
+      btn.dataset.doctorId = d.id;
+      btn.innerHTML = `<div><strong>${d.name}</strong><div class="small text-muted">${d.speciality}</div></div><div class="small text-muted">ID ${d.id}</div>`;
 
-      if (occupied) {
+      btn.addEventListener('click', () => {
+        selectedDoctorId = d.id;
+        // visual
+        doctorListEl.querySelectorAll('.list-group-item').forEach(x => {
+          x.classList.remove('active','bg-primary','text-white');
+        });
+        btn.classList.add('active','bg-primary','text-white');
+        selectedSlot = null;
+        renderSchedule();
+      });
+
+      doctorListEl.appendChild(btn);
+    });
+  }
+
+  btnDoctorSearch?.addEventListener('click', () => renderDoctors(doctorSearchInput.value));
+  doctorSearchInput?.addEventListener('keyup', (e) => { if (e.key === 'Enter') renderDoctors(doctorSearchInput.value); });
+
+  // Omitir -> seleccionar médico aleatorio
+  omitDoctorBtn?.addEventListener('click', () => {
+    if (doctors.length === 0) return;
+    const rand = doctors[Math.floor(Math.random()*doctors.length)];
+    selectedDoctorId = rand.id;
+    doctorListEl.querySelectorAll('.list-group-item').forEach(x => x.classList.remove('active','bg-primary','text-white'));
+    const btn = Array.from(doctorListEl.children).find(c => c.dataset && Number(c.dataset.doctorId) === rand.id);
+    if (btn) {
+      btn.classList.add('active','bg-primary','text-white');
+      btn.scrollIntoView({behavior:'smooth',block:'center'});
+    }
+    selectedSlot = null;
+    renderSchedule();
+  });
+
+  // ==== horarios (cada 20 minutos) ====
+  function renderSchedule(){
+    scheduleGrid.innerHTML = '';
+
+    if (!selectedDate || !selectedDoctorId){
+      scheduleGrid.innerHTML = '<div class="text-muted small">Seleccione primero un día y un médico.</div>';
+      return;
+    }
+
+    const dateISO = formatDateISO(selectedDate);
+    // intervalos 20 minutos desde 08:00 hasta 17:00 (incl 17:00)
+    const start = 8*60; // minutos
+    const end = 17*60;
+    const fragment = document.createDocumentFragment();
+
+    for (let t = start; t <= end; t += 20){
+      const h = Math.floor(t/60);
+      const m = t%60;
+      const timeLabel = `${pad2(h)}:${pad2(m)}`;
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.textContent = timeLabel;
+      btn.style.minWidth = '90px';
+      btn.className = 'btn btn-sm m-1';
+
+      const occupied = isOccupiedDeterministic(dateISO, selectedDoctorId, t);
+      if (occupied){
         btn.classList.add('btn-danger');
         btn.disabled = true;
       } else {
         btn.classList.add('btn-outline-success');
         btn.addEventListener('click', () => {
-          // seleccionar
-          selectedSlot = slot;
-          // actualizar clases visuales
+          // desmarcar otros
           scheduleGrid.querySelectorAll('button').forEach(b => {
-            b.classList.remove('btn-primary');
-            // solo botones disponibles conservan el outline
-            if (!b.disabled && !b.classList.contains('btn-danger')) {
+            if (!b.disabled) {
+              b.classList.remove('btn-primary');
+              // dejar outline para disponibles
               b.classList.remove('btn-success');
-              b.classList.add('btn-outline-success');
+              if (!b.classList.contains('btn-outline-success')) {
+                b.classList.add('btn-outline-success');
+              }
             }
           });
+          // marcar seleccionado
           btn.classList.remove('btn-outline-success');
           btn.classList.add('btn-primary');
+          selectedSlot = timeLabel;
         });
       }
 
-      scheduleGrid.appendChild(btn);
-    });
+      fragment.appendChild(btn);
+    }
 
-    // si ya hay slot seleccionado y aún disponible, re-seleccionarlo visualmente
-    if (selectedSlot) {
-      const existing = Array.from(scheduleGrid.querySelectorAll('button')).find(b => b.textContent === selectedSlot && !b.disabled);
-      if (existing) {
-        existing.classList.remove('btn-outline-success');
-        existing.classList.add('btn-primary');
+    scheduleGrid.appendChild(fragment);
+
+    // si había slot seleccionado y todavía existe, volver a seleccionarlo
+    if (selectedSlot){
+      const exists = Array.from(scheduleGrid.querySelectorAll('button')).find(b => !b.disabled && b.textContent === selectedSlot);
+      if (exists){
+        exists.classList.remove('btn-outline-success');
+        exists.classList.add('btn-primary');
       } else {
-        selectedSlot = null; // slot no disponible en la nueva vista
+        selectedSlot = null;
       }
     }
   }
 
-  // ---------- Navegación entre tabs (Bootstrap Tab API) ----------
-  function showTabById(tabId) {
-    const tabTriggerEl = document.querySelector(`#${tabId}`);
-    if (!tabTriggerEl) return;
-    const tab = new bootstrap.Tab(tabTriggerEl);
-    tab.show();
-  }
-
+  // ==== confirmación y navegación de tabs ====
   continueBtn?.addEventListener('click', () => {
-    if (!selectedDate) {
-      alert('Seleccione una fecha primero.');
-      return;
-    }
-    if (!selectedSlot) {
-      alert('Seleccione un horario disponible.');
-      return;
-    }
+    if (!selectedDate) return alert('Seleccione una fecha.');
+    if (!selectedDoctorId) return alert('Seleccione un médico (o presione Omitir).');
+    if (!selectedSlot) return alert('Seleccione un horario.');
 
-    // llenar confirmación
-    confirmDateInput.value = formatDate(selectedDate);
-    confirmDoctorIdInput.value = selectedDoctorId ?? '';
-    confirmDoctorEl.textContent = selectedDoctorId ? (doctors.find(d => d.id === selectedDoctorId)?.name ?? '---') : 'Cualquiera';
+    confirmDateInput.value = formatDateISO(selectedDate);
+    confirmDoctorIdInput.value = selectedDoctorId;
+    confirmDoctorEl.textContent = doctors.find(d=>d.id===selectedDoctorId)?.name ?? 'Cualquiera';
     confirmTypeEl.textContent = 'General';
-    confirmScheduleEl.textContent = `${formatDisplayDate(selectedDate)} · ${selectedSlot}`;
+    confirmScheduleEl.textContent = `${selectedDate.toLocaleDateString()} · ${selectedSlot}`;
 
-    // cambiar a pestaña 2
-    showTabById('step2-tab');
+    const step2TabTrigger = document.getElementById('step2-tab');
+    if (step2TabTrigger) new bootstrap.Tab(step2TabTrigger).show();
   });
 
   backBtn?.addEventListener('click', () => {
-    showTabById('step1-tab');
+    const step1 = document.getElementById('step1-tab');
+    if (step1) new bootstrap.Tab(step1).show();
   });
 
   confirmBtn?.addEventListener('click', () => {
-    // Simula guardar: muestra modal bootstrap
     const modalEl = document.getElementById('confirmModal');
-    const modal = new bootstrap.Modal(modalEl);
-    modal.show();
-    // opcional: reset selección (comentar si no quieres resetear)
-    selectedDate = null;
-    selectedSlot = null;
-    selectedDoctorId = null;
-    // re-render para limpiar UI
-    renderCalendar(currentMonth);
-    renderDoctors();
-    renderSchedule();
-    confirmDoctorEl.textContent = '__________';
-    confirmScheduleEl.textContent = '__________';
+    if (modalEl) new bootstrap.Modal(modalEl).show();
+    // opcional: resetear selección
+    // selectedDate = selectedDoctorId = selectedSlot = null;
+    // renderCalendar(currentMonth); renderDoctors(); renderSchedule();
   });
 
-  // ---------- inicialización ----------
-  function init() {
-    // marcar currentMonth al primer día del mes
-    currentMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
-    renderCalendar(currentMonth);
-    renderDoctors();
-    renderSchedule();
-  }
-
-  document.addEventListener('DOMContentLoaded', init);
-})();
+  // ==== inicialización ====
+  renderCalendar(currentMonth);
+  renderDoctors();
+  renderSchedule();
+});
