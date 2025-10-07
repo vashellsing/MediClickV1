@@ -33,9 +33,9 @@ document.addEventListener('DOMContentLoaded', () => {
   // ----- datos de ejemplo (médicos) -----
   const doctors = [
     { id: 1, name: 'Dra. Laura Méndez', speciality: 'Medicina general' },
-    { id: 2, name: 'Dr. Carlos Ruiz', speciality: 'Pediatría' },
-    { id: 3, name: 'Dra. Natalia Gómez', speciality: 'Ginecología' },
-    { id: 4, name: 'Dr. Andrés Pérez', speciality: 'Ortopedia' }
+    { id: 2, name: 'Dr. Carlos Ruiz', speciality: 'Medicina general' },
+    { id: 3, name: 'Dra. Natalia Gómez', speciality: 'Medicina general' },
+    { id: 4, name: 'Dr. Andrés Pérez', speciality: 'Medicina general' }
   ];
 
   // ==== utilidades ====
