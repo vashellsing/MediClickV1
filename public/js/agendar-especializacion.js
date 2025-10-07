@@ -272,7 +272,7 @@ function renderCalendar(date) {
     confirmDateInput.value = formatDateISO(selectedDate);
     confirmDoctorIdInput.value = selectedDoctorId;
     confirmDoctorEl.textContent = doctors.find(d=>d.id===selectedDoctorId)?.name ?? 'Cualquiera';
-    confirmTypeEl.textContent = 'General';
+    confirmTypeEl.textContent = 'Especialización';
     confirmScheduleEl.textContent = `${selectedDate.toLocaleDateString()} · ${selectedSlot}`;
 
     const step2TabTrigger = document.getElementById('step2-tab');

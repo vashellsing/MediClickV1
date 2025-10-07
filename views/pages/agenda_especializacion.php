@@ -1,4 +1,5 @@
 <?php
+// Si no hay sesión activa, redirige al inicio de sesión
 if (!isset($_SESSION['usuario'])) {
     header('Location: index.php?page=login');
     exit;
@@ -28,7 +29,34 @@ if (!isset($_SESSION['usuario'])) {
     <!-- Paso 1 -->
     <div class="tab-pane fade show active" id="step1" role="tabpanel">
       <div class="row">
-        <div class="col-lg-7">
+        <!--
+          INSTRUCCIONES / IMAGEN:
+          - Aparecen PRIMERO en pantallas pequeñas (order-1)
+          - En pantallas grandes se muestran a la derecha (order-lg-2)
+        -->
+        <div class="col-lg-5 order-1 order-lg-2 mb-3 mb-lg-0">
+          <div class="card">
+            <div class="card-body text-center">
+              <img src="public/img/Especializacion.png?height=300&width=300"
+                   alt="Especialización"
+                   class="img-fluid mb-3"
+                   style="max-height:220px;">
+              <h6 class="mb-1">Instrucciones</h6>
+              <p class="small text-muted">
+                Elige un día del calendario, selecciona la especialidad requerida,
+                luego selecciona un profesional (opcional) y finalmente un horario.
+                Haz clic en "Continuar" para confirmar.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!--
+          CONTENIDO PRINCIPAL (calendario, selección, horarios):
+          - Aparece después en pantallas pequeñas (order-2)
+          - En pantallas grandes va a la izquierda (order-lg-1)
+        -->
+        <div class="col-lg-7 order-2 order-lg-1">
           <h2 class="h5 mb-3">Seleccione día y hora deseada</h2>
 
           <!-- Calendario -->
@@ -58,7 +86,7 @@ if (!isset($_SESSION['usuario'])) {
             <div class="card-body">
               <select id="specializationSelect" class="form-select">
                 <option value="" selected disabled>Seleccione una especialización</option>
-                <option value="general">Neurología</option>
+                <option value="neurologia">Neurología</option>
                 <option value="pediatria">Pediatría</option>
                 <option value="odontologia">Odontología</option>
                 <option value="dermatologia">Dermatología</option>
@@ -99,30 +127,27 @@ if (!isset($_SESSION['usuario'])) {
             <button class="btn btn-primary" id="continueBtn">Continuar</button>
           </div>
         </div>
-
-        <!-- Imagen / info lateral -->
-        <div class="col-lg-5">
-          <div class="card">
-            <div class="card-body text-center">
-              <img src="/placeholder.svg?height=300&width=300" alt="Doctor y paciente" class="img-fluid mb-3" style="max-height:220px;">
-              <h6 class="mb-1">Instrucciones</h6>
-              <p class="small text-muted">Elige un día del calendario, selecciona un profesional (opcional) y luego un horario. Haz clic en "Continuar" para confirmar.</p>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
 
     <!-- Paso 2 -->
     <div class="tab-pane fade" id="step2" role="tabpanel">
       <div class="row">
-        <div class="col-lg-7">
+        <!--
+          En este paso también mostramos la imagen/instrucciones primero en móviles
+          y a la derecha en pantallas grandes.
+        -->
+        <div class="col-lg-5 order-1 order-lg-2 mb-3 mb-lg-0 text-center">
+          <img src="public/img/Especializacion.png?height=400&width=400" alt="Especialización" class="img-fluid">
+        </div>
+
+        <div class="col-lg-7 order-2 order-lg-1">
           <h2 class="h5 mb-3">Por favor, confirme la cita</h2>
 
           <div class="card mb-4">
             <div class="card-body">
               <p><strong>Nombre médico:</strong> <span id="confirmDoctor">__________</span></p>
-              <p><strong>Tipo de cita:</strong> <span id="confirmType">General</span></p>
+              <p><strong>Tipo de cita:</strong> <span id="confirmType">__________</span></p>
               <p><strong>Horario seleccionado:</strong> <span id="confirmSchedule">__________</span></p>
               <input type="hidden" id="confirmDate" value="">
               <input type="hidden" id="confirmDoctorId" value="">
@@ -133,11 +158,6 @@ if (!isset($_SESSION['usuario'])) {
             <button class="btn btn-secondary" id="backBtn">Volver</button>
             <button class="btn btn-success" id="confirmBtn">Confirmar</button>
           </div>
-        </div>
-
-        <!-- Imagen -->
-        <div class="col-lg-5 d-none d-lg-block text-center">
-          <img src="/placeholder.svg?height=400&width=400" alt="Doctor y paciente" class="img-fluid">
         </div>
       </div>
     </div>
@@ -158,5 +178,5 @@ if (!isset($_SESSION['usuario'])) {
   </div>
 </div>
 
-<!-- Script (ya apuntado en el layout anterior; si no, dejar aquí) -->
+<!-- Script de funcionamiento -->
 <script src="public/js/agendar-especializacion.js"></script>

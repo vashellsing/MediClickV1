@@ -1,0 +1,156 @@
+/* ==============================
+   DASHBOARD BÁSICO
+   ============================== */
+main h1 {
+  font-size: 2.2rem;
+  letter-spacing: 0.5px;
+}
+
+main p.lead {
+  font-size: 1.2rem;
+  color: #495057;
+}
+
+main .btn {
+  border-radius: 0.6rem;
+  padding: 0.6rem 1.4rem;
+  transition: transform 0.2s ease;
+}
+
+main .btn:hover {
+  transform: translateY(-2px);
+}
+
+main img {
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.1));
+}
+
+
+/* ==============================
+   SIDEBAR: ESTILO GENERAL
+   ============================== */
+.sidebar {
+  min-height: 100vh;
+  border-right: 1px solid rgba(0,0,0,0.05);
+  padding-bottom: 2rem;
+}
+
+/* Avatar del usuario */
+.avatar {
+  width: 44px;
+  height: 44px;
+  background: linear-gradient(135deg,#e9f0ff,#f1f7ff);
+  color: #0d6efd;
+  font-size: 1.05rem;
+  border-radius: 50%;
+  box-shadow: 0 2px 6px rgba(13,110,253,0.06);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+}
+
+/* Enlaces y botones del sidebar */
+.sidebar .nav-link,
+.sidebar .btn {
+  color: #212529;
+  transition: background-color .12s ease, transform .08s ease;
+}
+
+/* Hover en enlaces y botones */
+.sidebar .nav-link:hover,
+.sidebar .btn:hover {
+  background-color: rgba(13,110,253,0.06);
+  text-decoration: none;
+  transform: translateY(-1px);
+}
+
+/* Enlace activo */
+.sidebar .nav-link.active {
+  background-color: #0d6efd;
+  color: #fff !important;
+  box-shadow: 0 4px 12px rgba(13,110,253,0.12);
+}
+
+/* Submenús con menor indentación */
+.sidebar .collapse .nav-link {
+  padding-left: 1.25rem;
+  font-size: .95rem;
+}
+
+/* Flecha para desplegar submenús */
+.sidebar .caret {
+  transition: transform .2s ease;
+  color: #6c757d;
+  font-size: .95rem;
+}
+.sidebar .caret.rotated {
+  transform: rotate(180deg);
+}
+
+/* Ajuste en offcanvas (sidebar colapsable) */
+.offcanvas-body .nav .nav-item + .nav-item {
+  margin-top: .25rem;
+}
+
+/* ==============================
+   RESPONSIVE: AJUSTES PARA PANTALLAS PEQUEÑAS
+   ============================== */
+@media (max-width: 767.98px) {
+  /* El sidebar no tiene borde y altura automática */
+  .sidebar {
+    border-right: none;
+    min-height: auto;
+    padding-bottom: 0;
+  }
+}
+
+
+/* ==============================
+   TABLAS Y BADGES -HISTORIAL
+   ============================== */
+.badge-fixed {
+  display: inline-block;
+  width: 110px; /* ajustar según necesidad */
+  text-align: center;
+  padding: 0.5em;
+  font-size: 0.9rem;
+}
+
+/* ==============================
+   Norificaciones del NavBar
+   ============================== */
+
+/* Notificaciones del navbar */
+/* Notificaciones tipo historial */
+#notificationsList .dropdown-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  transition: background-color 0.15s ease;
+  font-size: 0.95rem;
+  margin-bottom: 0.25rem;
+}
+
+/* Hover */
+#notificationsList .dropdown-item:hover {
+  background-color: rgba(13, 110, 253, 0.08);
+  text-decoration: none;
+}
+
+/* Tipo de notificación */
+.notification-agendada { background-color: #0d6efd; color: #fff; }
+.notification-reprogramada { background-color: #0dcaf0; color: #212529; }
+.notification-cancelada { background-color: #dc3545; color: #fff; }
+.notification-completada { background-color: #198754; color: #fff; }
+
+/* Hora en la notificación */
+#notificationsList .dropdown-item small {
+  font-size: 0.8rem;
+  color: #f8f9fa;
+  opacity: 0.9;
+}
+
+

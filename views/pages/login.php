@@ -1,66 +1,85 @@
+<?php
+// Evita avisos si las variables aún no existen
+$error = isset($error) ? $error : '';
+$oldEmail = isset($_POST['email']) ? htmlspecialchars($_POST['email'], ENT_QUOTES) : '';
+?>
 
-<div class="container d-flex justify-content-center align-items-center" style="min-height: 80vh;">
-  <div class="card shadow-sm p-4" style="max-width: 400px; width: 100%;">
-    <h3 class="text-center mb-4">Inicia sesión</h3>
-
-    <form id="loginForm" method="POST" action="index.php?page=login" novalidate>
-      <!-- Correo -->
-      <div class="mb-3">
-        <label for="email" class="form-label">Correo</label>
-        <input
-          type="email"
-          class="form-control"
-          id="email"
-          name="email"
-          placeholder="ejemplo@correo.com"
-          required
-          value="<?php echo htmlspecialchars($_POST['email'] ?? '', ENT_QUOTES); ?>"
-        >
+<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-4">
+  <div class="container d-flex justify-content-center align-items-center" style="min-height: 75vh;">
+    <div class="card login-card shadow-sm p-4" style="max-width:420px; width:100%;">
+      <!-- Logo (opcional) -->
+      <div class="text-center mb-3">
+        <!-- si tienes una imagen: public/img/Portada.png -->
+        <img src="public/img/Portada.png" alt="MediClick" class="img-fluid" style="max-height:72px; object-fit:contain;">
       </div>
 
-      <!-- Contraseña, se podrian agregar mas validaciones sobre solo numeros ... mensajes o alertas... -->
-      <div class="mb-3">
-        <label for="password" class="form-label">Contraseña (Número de cédula)</label>
-        <div class="input-group">
+      <h4 class="text-center fw-bold mb-3">Iniciar sesión</h4>
+      <p class="text-center text-muted small mb-4">Ingresa con tu correo y número de cédula como contraseña.</p>
+
+      <form id="loginForm" method="POST" action="index.php?page=login" novalidate>
+        <!-- Email -->
+        <div class="mb-3">
+          <label for="email" class="form-label">Correo</label>
           <input
-            type="password"
+            type="email"
             class="form-control"
-            id="password"
-            name="password"
-            minlength="8"
+            id="email"
+            name="email"
+            placeholder="ejemplo@correo.com"
             required
-            aria-describedby="togglePasswordBtn"
+            value="<?php echo $oldEmail; ?>"
+            aria-describedby="emailHelp"
           >
-          <button
-            class="btn btn-outline-secondary"
-            type="button"
-            id="togglePasswordBtn"
-            aria-pressed="false"
-            aria-label="Mostrar contraseña"
-          >👁</button>
+          <div id="emailHelp" class="form-text">Usa el correo con el que te registraste.</div>
         </div>
-      </div>
 
-      <!-- Mensaje de error (server-side o para JS) -->
-      <?php if (!empty($error)): ?>
-        <div id="errorMsg" class="text-danger mb-3">
-          <?php echo htmlspecialchars($error, ENT_QUOTES); ?>
+        <!-- Password -->
+        <div class="mb-3">
+          <label for="password" class="form-label">Contraseña (Número de cédula)</label>
+          <div class="input-group">
+            <input
+              type="password"
+              class="form-control"
+              id="password"
+              name="password"
+              minlength="8"
+              required
+              aria-describedby="togglePasswordBtn"
+              placeholder="********"
+            >
+            <button
+              class="btn btn-outline-secondary"
+              type="button"
+              id="togglePasswordBtn"
+              aria-pressed="false"
+              aria-label="Mostrar o ocultar contraseña"
+              title="Mostrar contraseña"
+            >👁</button>
+          </div>
+          <div class="form-text small">La contraseña debe tener al menos 8 caracteres.</div>
         </div>
-      <?php else: ?>
-        <div id="errorMsg" class="text-danger mb-3" style="display:none;"></div>
-      <?php endif; ?>
 
-      <!-- Botón -->
-      <div class="d-grid">
-        <button type="submit" class="btn btn-primary">Iniciar</button>
+
+        <!-- Error (server-side o JS) -->
+        <?php if (!empty($error)): ?>
+          <div id="errorMsg" class="alert alert-danger" role="alert"><?php echo htmlspecialchars($error, ENT_QUOTES); ?></div>
+        <?php else: ?>
+          <div id="errorMsg" class="alert alert-danger" role="alert" style="display:none;"></div>
+        <?php endif; ?>
+
+        <!-- Submit -->
+        <div class="d-grid mb-3">
+          <button type="submit" class="btn btn-primary btn-lg" id="loginSubmit">Iniciar sesión</button>
+        </div>
+
+        <div class="text-center">
+          <a href="#" class="small">¿Olvidaste tu contraseña?</a>
+        </div>
+      </form>
+
+      <div class="text-center mt-3 small text-muted">
+        Al usar MediClick aceptas nuestros <a href="#">Términos</a> y la <a href="#">Política de privacidad</a>.
       </div>
-    </form>
-
-    <!-- Links -->
-    <div class="text-center mt-3">
-      <a href="#">Términos de uso</a> | <a href="#">Política de privacidad</a>
     </div>
   </div>
-</div>
-
-<script src="public/js/login.js"></script>
+</main>
