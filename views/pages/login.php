@@ -7,10 +7,11 @@ $oldEmail = isset($_POST['email']) ? htmlspecialchars($_POST['email'], ENT_QUOTE
 <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-4">
   <div class="container d-flex justify-content-center align-items-center" style="min-height: 75vh;">
     <div class="card login-card shadow-sm p-4" style="max-width:420px; width:100%;">
-      <!-- Logo (opcional) -->
+      <!-- Logito -->
       <div class="text-center mb-3">
-        <!-- si tienes una imagen: public/img/Portada.png -->
-        <img src="public/img/Portada.png" alt="MediClick" class="img-fluid" style="max-height:72px; object-fit:contain;">
+        
+        <img src="public/img/Icono.png" alt="MediClick" class="img-fluid" style="max-height:72px; object-fit:contain;">
+       <h1> <span class="fw-semibold">MediClick</span></h1>
       </div>
 
       <h4 class="text-center fw-bold mb-3">Iniciar sesión</h4>
@@ -56,7 +57,7 @@ $oldEmail = isset($_POST['email']) ? htmlspecialchars($_POST['email'], ENT_QUOTE
               title="Mostrar contraseña"
             >👁</button>
           </div>
-          <div class="form-text small">La contraseña debe tener al menos 8 caracteres.</div>
+          <div class="form-text small"></div>
         </div>
 
 
