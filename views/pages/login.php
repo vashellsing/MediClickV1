@@ -31,7 +31,7 @@ $oldEmail = isset($_POST['email']) ? htmlspecialchars($_POST['email'], ENT_QUOTE
             value="<?php echo $oldEmail; ?>"
             aria-describedby="emailHelp"
           >
-          <div id="emailHelp" class="form-text">Usa el correo con el que te registraste.</div>
+     
         </div>
 
         <!-- Password -->

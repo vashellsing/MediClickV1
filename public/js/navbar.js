@@ -4,8 +4,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const notifications = [
     { text: "Cita agendada", time: "09:00", type: "agendada" },
     { text: "Cita reprogramada", time: "10:30", type: "reprogramada" },
-    { text: "Cita cancelada", time: "11:45", type: "cancelada" },
-    { text: "Cita completada", time: "08:00", type: "completada" }
+    { text: "Cita cancelada", time: "11:45", type: "cancelada" }
   ];
 
   const list = document.getElementById('notificationsList');
