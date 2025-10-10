@@ -32,7 +32,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $page === 'login') {
     $password = $_POST['password'] ?? '';
 
     // Comprobación simulada (mas adelante reemplazar por BD)
-    if ($email === 'admin@mediclick.com' && $password === '12345678') {
+    if ($email === 'juanperez@gmail.com' && $password === '12345678') {
         $_SESSION['usuario'] = 'Juan Pérez';
         header("Location: index.php?page=dashboard");
         exit;
