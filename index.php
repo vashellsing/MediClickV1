@@ -1,68 +1,91 @@
 <?php
-//esto simula la sesion con php, sigue siendo front
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-$page = $_GET['page'] ?? 'login';
+require_once __DIR__ . '/config/database.php';
 
-// ayuda a cerrar sesion
-// Si la página es 'logout', destruye la sesión y redirige al login
+$page = $_GET['page'] ?? 'login';
+$error = '';
+
+/* ===========================
+   🚪 CERRAR SESIÓN
+=========================== */
 if ($page === 'logout') {
-    // Limpia variables de sesión
-    $_SESSION = [];
-    if (ini_get("session.use_cookies")) {
-        $params = session_get_cookie_params();
-        setcookie(session_name(), '', time() - 42000,
-            $params['path'], $params['domain'],
-            $params['secure'], $params['httponly']
-        );
-    }
+    session_unset();
     session_destroy();
     header("Location: index.php?page=login");
     exit;
 }
 
-// Inicializa variable de error, para mostrar errores en validacion, se puede reutilizar en cualquier formulario
-$error = '';
-
-// Procesar login (POST desde index.php?page=login)
+/* ===========================
+   🔑 PROCESAR LOGIN (SOLO PACIENTES)
+=========================== */
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $page === 'login') {
-    $email = $_POST['email'] ?? '';
-    $password = $_POST['password'] ?? '';
+    $email = trim($_POST['email'] ?? '');
+    $password = trim($_POST['password'] ?? '');
 
-    // Comprobación simulada (mas adelante reemplazar por BD)
-    if ($email === 'admin@mediclick.com' && $password === '12345678') {
-        $_SESSION['usuario'] = 'Juan Pérez';
-        header("Location: index.php?page=dashboard");
-        exit;
-    } else {
-        $error = "Credenciales incorrectas";
+    try {
+        // Buscar paciente por correo
+        $stmt = $conn->prepare("
+            SELECT p.*, r.rol AS nombre_rol 
+            FROM pacientes p
+            JOIN roles r ON p.id_rol = r.id_rol
+            WHERE p.correo = :email
+            LIMIT 1
+        ");
+        $stmt->bindParam(':email', $email);
+        $stmt->execute();
+        $paciente = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        // Verificar si encontró paciente
+        if ($paciente) {
+            $cedulaBD = trim($paciente['cedula']);
+            $passwordInput = trim($password);
+
+            if ($passwordInput === $cedulaBD) {
+                $_SESSION['usuario'] = $paciente['nombre'];
+                $_SESSION['rol'] = $paciente['nombre_rol'];
+                $_SESSION['id'] = $paciente['id_paciente'];
+
+                header("Location: index.php?page=dashboard");
+                exit;
+            } else {
+                $error = "Contraseña incorrecta. Usa tu número de cédula exactamente como está registrado.";
+            }
+        } else {
+            $error = "No se encontró un usuario con ese correo electrónico.";
+        }
+    } catch (PDOException $e) {
+        $error = "Error al conectar con la base de datos: " . $e->getMessage();
     }
 }
 
-// Incluye header y navbars
+
+/* ===========================
+   🧱 LAYOUT GENERAL
+=========================== */
 include __DIR__ . '/views/layouts/header.php';
 include __DIR__ . '/views/layouts/navbar.php';
 
-// Abre contenedor principal (layout): el sidebar y el contenido usarán esta fila/columnas
 echo '<div class="container-fluid"><div class="row">';
 
-// esto hace que el sidevar solo aparezca si hay sesion activa... o si no aparece en el login xd y pos no
+// Mostrar sidebar solo si hay sesión iniciada
 if (!empty($_SESSION['usuario'])) {
     include __DIR__ . '/views/layouts/sidebar.php';
 }
 
-// esto es lo que sirve oara redirigir, en caso que redirija a una pagina que no exista o mal puesta, dice que no la encuentra
+// Cargar página según parámetro
 $viewFile = __DIR__ . "/views/pages/{$page}.php";
 if (file_exists($viewFile)) {
     include $viewFile;
 } else {
-    echo "<main class='col-12'><h2>Página no encontrada</h2></main>";
+    echo "<main class='col-12'><h2 class='text-center mt-5 text-danger'>Página no encontrada</h2></main>";
 }
 
-// Cierra contenedor principal
 echo '</div></div>';
 
-// Incluye footer
 include __DIR__ . '/views/layouts/footer.php';
