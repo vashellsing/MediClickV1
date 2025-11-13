@@ -91,6 +91,8 @@ if (!isset($_SESSION['usuario'])) {
             </div>
           </div>
 
+          <!-- Texto adicional -->
+  
           <!-- Horarios disponibles -->
           <div class="card mb-4">
             <div class="card-header">Horarios disponibles</div>
