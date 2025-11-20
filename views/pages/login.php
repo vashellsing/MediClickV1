@@ -86,12 +86,27 @@ $oldEmail = isset($_POST['email']) ? htmlspecialchars($_POST['email'], ENT_QUOTE
   </div>
 </main>
 
-<!-- Script para mostrar/ocultar contraseña -->
+<!-- Script alternativo -->
 <script>
-document.getElementById('togglePasswordBtn').addEventListener('click', function() {
-  const passwordInput = document.getElementById('password');
-  const isHidden = passwordInput.getAttribute('type') === 'password';
-  passwordInput.setAttribute('type', isHidden ? 'text' : 'password');
-  this.textContent = isHidden ? '🙈' : '👁';
-});
+(function() {
+    // Esperar un poco más para asegurar que Bootstrap haya terminado
+    setTimeout(function() {
+        const toggleBtn = document.getElementById('togglePasswordBtn');
+        const passwordInput = document.getElementById('password');
+        
+        if (toggleBtn && passwordInput) {
+            // Remover cualquier event listener existente
+            const newToggleBtn = toggleBtn.cloneNode(true);
+            toggleBtn.parentNode.replaceChild(newToggleBtn, toggleBtn);
+            
+            // Agregar nuevo event listener
+            newToggleBtn.addEventListener('click', function() {
+                const isHidden = passwordInput.type === 'password';
+                passwordInput.type = isHidden ? 'text' : 'password';
+                this.textContent = isHidden ? '🙈' : '👁';
+                this.setAttribute('title', isHidden ? 'Ocultar contraseña' : 'Mostrar contraseña');
+            });
+        }
+    }, 100);
+})();
 </script>

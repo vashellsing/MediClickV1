@@ -156,7 +156,7 @@ if (!isset($_SESSION['usuario'])) {
         <i class="fas fa-check-circle fa-3x"></i>
       </div>
       <h5 class="modal-title mb-2">¡Cita agendada exitosamente!</h5>
-      <p class="mb-4">Su cita ha sido registrada correctamente (simulado en front).</p>
+      <p class="mb-4">Su cita ha sido registrada correctamente.</p>
       <a href="index.php?page=dashboard" class="btn btn-primary">Aceptar</a>
     </div>
   </div>

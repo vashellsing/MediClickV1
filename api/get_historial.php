@@ -1,9 +1,16 @@
 <?php
+session_start();
 header('Content-Type: application/json');
 require_once '../config/database.php';
 
-// Por ahora paciente_id = 1 para testing
-$paciente_id = 1;
+// Verificar sesión con los nombres CORRECTOS
+if (!isset($_SESSION['id']) || $_SESSION['rol'] != 'PACIENTE') {
+    http_response_code(401);
+    echo json_encode(['error' => 'No autorizado - Sesión inválida']);
+    exit;
+}
+
+$paciente_id = $_SESSION['id'];
 
 try {
     $stmt = $conn->prepare("
@@ -11,26 +18,25 @@ try {
             c.id_cita,
             c.fecha_hora_cita,
             c.estado,
-            c.tipo_cita,
+            c.id_medico,  -- ¡IMPORTANTE: agregar este campo!
             m.nombre as medico_nombre,
             m.apellido as medico_apellido,
+            m.id_especialidad,
             CONCAT('Dr. ', m.nombre, ' ', m.apellido) as medico_completo,
-            e.nombre as especialidad
+            e.nombre as especialidad,
+            -- Determinar tipo_cita basado en la especialidad del médico
+            CASE 
+                WHEN m.id_especialidad = 1 THEN 'General'
+                ELSE 'Especialización'
+            END as tipo_cita
         FROM citas c
         JOIN medicos m ON c.id_medico = m.id_medico
         LEFT JOIN especialidad e ON m.id_especialidad = e.id_especialidad
         WHERE c.id_paciente = ?
-        ORDER BY c.fecha_hora_cita DESC
+        ORDER BY c.fecha_creacion DESC 
     ");
     $stmt->execute([$paciente_id]);
     $citas = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-    // Debug: ver qué datos estamos obteniendo
-    error_log("Citas encontradas: " . count($citas));
-    
-    if (count($citas) > 0) {
-        error_log("Primera cita: " . print_r($citas[0], true));
-    }
 
     echo json_encode($citas);
     

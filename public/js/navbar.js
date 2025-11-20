@@ -1,97 +1,160 @@
-// public/js/navbar.js - VERSIÓN SIMPLIFICADA Y CORREGIDA
+// public/js/navbar.js - VERSIÓN CON ACTUALIZACIÓN REAL
 
 document.addEventListener('DOMContentLoaded', function() {
     const notificationCount = document.getElementById('notificationCount');
-    const notificationsList = document.getElementById('notificationsList');
+    const notificationsDropdown = document.getElementById('notificationsDropdown');
     
-    // Cargar notificaciones inmediatamente
-    loadNotifications();
-    
-    // Recargar cada 10 segundos
-    setInterval(loadNotifications, 10000);
+    let notificationsMarkedAsRead = false;
+    let updateInterval;
 
-    async function loadNotifications() {
-        try {
-            console.log('🔄 Cargando notificaciones...');
-            const response = await fetch('api/get_notifications.php');
+    // Iniciar actualización automática
+    startAutoUpdate();
+
+    // Eventos del dropdown
+    if (notificationsDropdown) {
+        // Cuando se ABRE el dropdown
+        notificationsDropdown.addEventListener('show.bs.dropdown', function() {
+            console.log('🔔 Dropdown abierto');
             
-            if (!response.ok) {
-                throw new Error(`Error: ${response.status}`);
-            }
+            // Pausar actualizaciones automáticas mientras el dropdown está abierto
+            stopAutoUpdate();
             
-            const notifications = await response.json();
-            console.log('📨 Notificaciones recibidas:', notifications);
+            // Marcar como leídas después de un pequeño delay
+            setTimeout(() => {
+                if (!notificationsMarkedAsRead) {
+                    markNotificationsAsRead();
+                    notificationsMarkedAsRead = true;
+                }
+            }, 500);
+        });
+
+        // Cuando se CIERRA el dropdown
+        notificationsDropdown.addEventListener('hidden.bs.dropdown', function() {
+            console.log('🔔 Dropdown cerrado');
             
-            updateNotificationCounter(notifications);
-            renderNotifications(notifications);
+            // Reanudar actualizaciones automáticas
+            startAutoUpdate();
             
-        } catch (error) {
-            console.error('❌ Error cargando notificaciones:', error);
+            // Permitir marcar como leídas nuevamente la próxima vez
+            setTimeout(() => {
+                notificationsMarkedAsRead = false;
+            }, 1000);
+        });
+    }
+
+    function startAutoUpdate() {
+        // Detener intervalo anterior si existe
+        if (updateInterval) {
+            clearInterval(updateInterval);
+        }
+        
+        // Actualizar inmediatamente
+        updateNotificationCount();
+        
+        // Configurar intervalo cada 20 segundos
+        updateInterval = setInterval(updateNotificationCount, 20000);
+        console.log('🔄 Iniciada actualización automática cada 20 segundos');
+    }
+
+    function stopAutoUpdate() {
+        if (updateInterval) {
+            clearInterval(updateInterval);
+            updateInterval = null;
+            console.log('⏸️ Detenida actualización automática');
         }
     }
 
-    function updateNotificationCounter(notifications) {
+    async function updateNotificationCount() {
+        try {
+            console.log('🔄 Verificando nuevas notificaciones...');
+            const response = await fetch('api/get_notification_count.php?t=' + Date.now());
+            
+            if (response.ok) {
+                const data = await response.json();
+                const currentCount = data.unread_count;
+                
+                // Solo actualizar si el conteo cambió
+                const currentDisplayCount = notificationCount.style.display !== 'none' ? 
+                    parseInt(notificationCount.textContent) : 0;
+                
+                if (currentCount !== currentDisplayCount) {
+                    updateCounterDisplay(currentCount);
+                    console.log(`📊 Contador actualizado: ${currentCount} notificaciones no leídas`);
+                    
+                    // Si hay nuevas notificaciones y el dropdown no está abierto, mostrar notificación
+                    if (currentCount > currentDisplayCount && currentDisplayCount === 0) {
+                        showNewNotificationAlert(currentCount);
+                    }
+                }
+            }
+        } catch (error) {
+            console.log('❌ Error actualizando contador:', error);
+        }
+    }
+
+    function updateCounterDisplay(count) {
         if (!notificationCount) return;
         
-        const unreadCount = notifications.filter(n => n.leida === 'no').length;
-        console.log(`🔔 Notificaciones no leídas: ${unreadCount}`);
-        
-        if (unreadCount > 0) {
-            notificationCount.textContent = unreadCount;
+        if (count > 0) {
+            notificationCount.textContent = count;
             notificationCount.style.display = 'block';
         } else {
             notificationCount.style.display = 'none';
         }
     }
 
-    function renderNotifications(notifications) {
-        if (!notificationsList) return;
+    function showNewNotificationAlert(count) {
+        // Crear una alerta visual de nuevas notificaciones
+        const alert = document.createElement('div');
+        alert.className = 'position-fixed top-0 end-0 m-3 p-3 bg-success text-white rounded shadow';
+        alert.style.zIndex = '1060';
+        alert.innerHTML = `
+            <div class="d-flex align-items-center">
+                <span class="me-2">🔔</span>
+                <span>Tienes ${count} nueva(s) notificación(es)</span>
+                <button type="button" class="btn-close btn-close-white ms-2" onclick="this.parentElement.parentElement.remove()"></button>
+            </div>
+        `;
         
-        // Limpiar solo las notificaciones (no los headers)
-        const existingNotifications = notificationsList.querySelectorAll('.notification-item, .no-notifications');
-        existingNotifications.forEach(item => item.remove());
+        document.body.appendChild(alert);
         
-        // Encontrar donde insertar (después del divider)
-        const divider = notificationsList.querySelector('.dropdown-divider');
-        const insertPoint = divider ? divider.nextSibling : notificationsList.lastChild;
-        
-        if (!Array.isArray(notifications) || notifications.length === 0) {
-            const emptyMsg = document.createElement('li');
-            emptyMsg.className = 'dropdown-item text-center text-muted no-notifications';
-            emptyMsg.innerHTML = '<small>No hay notificaciones</small>';
-            notificationsList.appendChild(emptyMsg);
-            return;
-        }
-        
-        notifications.forEach(notification => {
-            const li = document.createElement('li');
-            const isUnread = notification.leida === 'no';
-            
-            // Determinar ícono según el tipo de mensaje
-            let icon = '📄';
-            if (notification.mensaje.includes('agendada') || notification.mensaje.includes('exitosa')) {
-                icon = '✅';
-            } else if (notification.mensaje.includes('cancelada')) {
-                icon = '❌';
+        // Auto-remover después de 5 segundos
+        setTimeout(() => {
+            if (alert.parentElement) {
+                alert.remove();
             }
+        }, 5000);
+    }
+
+    async function markNotificationsAsRead() {
+        try {
+            console.log('📝 Marcando notificaciones como leídas...');
+            const response = await fetch('api/mark_notifications_read.php');
             
-            li.innerHTML = `
-                <a href="index.php?page=historial" class="dropdown-item notification-item ${isUnread ? 'fw-bold' : ''}">
-                    <div class="d-flex align-items-start">
-                        <span class="me-2">${icon}</span>
-                        <div class="flex-grow-1">
-                            <div class="small">${notification.mensaje}</div>
-                            <small class="text-muted">${notification.fecha_formateada || ''}</small>
-                        </div>
-                        ${isUnread ? '<span class="badge bg-danger ms-2">Nueva</span>' : ''}
-                    </div>
-                </a>
-            `;
-            
-            notificationsList.appendChild(li);
-        });
+            if (response.ok) {
+                const result = await response.json();
+                console.log('✅ Notificaciones marcadas como leídas');
+                
+                // Actualizar el contador localmente
+                updateCounterDisplay(0);
+            }
+        } catch (error) {
+            console.log('❌ Error marcando notificaciones como leídas:', error);
+        }
     }
     
-    // Hacer la función global para que otros scripts puedan usarla
-    window.loadNotifications = loadNotifications;
+    // Función global para forzar actualización inmediata (desde otros scripts)
+    window.forceNotificationUpdate = function() {
+        console.log('🚀 Forzando actualización de notificaciones');
+        updateNotificationCount();
+    };
+    
+    // Función para notificar desde otros scripts (cuando se agenda una cita)
+    window.notifyNewAppointment = function() {
+        console.log('📅 Nueva cita agendada - forzando actualización');
+        // Esperar un poco para que la notificación se guarde en la BD
+        setTimeout(() => {
+            updateNotificationCount();
+        }, 1000);
+    };
 });

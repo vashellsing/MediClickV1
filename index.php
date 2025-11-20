@@ -7,6 +7,7 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 require_once __DIR__ . '/config/database.php';
+require_once __DIR__ . '/vendor/autoload.php';
 
 $page = $_GET['page'] ?? 'login';
 $error = '';
@@ -89,3 +90,6 @@ if (file_exists($viewFile)) {
 echo '</div></div>';
 
 include __DIR__ . '/views/layouts/footer.php';
+
+error_reporting(E_ALL);
+ini_set('display_errors', 1);

@@ -2,6 +2,14 @@
 document.addEventListener('DOMContentLoaded', () => {
   console.log('agendar-especializacion.js cargado - CON BD');
 
+  let citaReprogramarId = null;
+  const datosReprogramar = sessionStorage.getItem('citaReprogramar');
+  if (datosReprogramar) {
+    const citaData = JSON.parse(datosReprogramar);
+    citaReprogramarId = citaData.id;
+    console.log('Modo reprogramación activado para cita:', citaReprogramarId);
+  }
+
   // ----- referencias DOM -----
   const calendarGrid = document.getElementById('calendarGrid');
   const currentMonthLabel = document.getElementById('currentMonth');
@@ -57,7 +65,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const lastDate = new Date(year, month + 1, 0).getDate();
 
     currentMonthLabel.textContent = date.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
-
+    if (datosReprogramar && !selectedDate) {
+    const citaData = JSON.parse(datosReprogramar);
+    if (citaData.fechaOriginal) {
+      const fechaOriginal = new Date(citaData.fechaOriginal);
+      if (fechaOriginal.getFullYear() === year && fechaOriginal.getMonth() === month) {
+        selectedDate = fechaOriginal;
+      }
+    }
+  }
     const startOffset = (firstDay.getDay() + 6) % 7; // lunes = 0
     const grid = document.createElement('div');
     grid.className = 'calendar-grid d-grid gap-2';
@@ -217,6 +233,14 @@ document.addEventListener('DOMContentLoaded', () => {
         "Seleccione una especialización y presione 'Buscar' para ver profesionales.";
       doctorListEl.appendChild(hint);
       return;
+    }
+
+    if (datosReprogramar && !filter) {
+      const citaData = JSON.parse(datosReprogramar);
+      if (citaData.medicoId) {
+        selectedDoctorId = citaData.medicoId;
+        console.log('Médico preseleccionado para reprogramación:', selectedDoctorId);
+      }
     }
 
     const q = (filter||'').trim().toLowerCase();
@@ -468,50 +492,76 @@ function renderSchedule() {
   });
 
   confirmBtn?.addEventListener('click', async () => {
+    // 1. Validaciones
     if (!selectedDate || !selectedSlot || !selectedDoctorId || !selectedSpecialization) {
-      alert('Faltan datos para confirmar la cita.');
-      return;
+        alert('Faltan datos para confirmar la cita.');
+        return;
     }
 
     try {
-      const appointmentData = {
-        paciente_id: await getPacienteId(),
-        medico_id: selectedDoctorId,
-        horario_id: selectedSlot.id,
-        tipo_cita: 'especializacion'
-      };
+      // === LÓGICA CENTRAL CORREGIDA ===
 
-      const response = await fetch('api/create_appointment.php', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(appointmentData)
-      });
+      // CASO A: ES UNA REPROGRAMACIÓN
+      if (citaReprogramarId) {
+        console.log("Procesando Reprogramación de Especialización...");
+        
+        const reprogramData = {
+            cita_id: citaReprogramarId,
+            nuevo_horario_id: selectedSlot.id
+        };
 
-      const result = await response.json();
+        // Llamada a la API atómica
+        const response = await fetch('api/reprogramar_cita.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(reprogramData)
+        });
 
-      if (result.success) {
-        const modalEl = document.getElementById('confirmModal');
-        if (modalEl) new bootstrap.Modal(modalEl).show();
-      } else {
-        alert('Error al agendar la cita: ' + (result.message || JSON.stringify(result)));
+        const result = await response.json();
+
+        if (result.success) {
+            sessionStorage.removeItem('citaReprogramar');
+            
+            if (window.notificationManager) window.notificationManager.showToast('¡Cita reprogramada exitosamente!', 'success');
+            if (window.notifyNewAppointment) window.notifyNewAppointment();
+
+            const modalEl = document.getElementById('confirmModal');
+            if (modalEl) new bootstrap.Modal(modalEl).show();
+        } else {
+            alert('Error al reprogramar: ' + (result.message || result.error));
+        }
+
+      } 
+      // CASO B: ES UNA CITA NUEVA DE ESPECIALIZACIÓN
+      else {
+        console.log("Procesando Cita Nueva Especialización...");
+        
+        const appointmentData = {
+            paciente_id: await getPacienteId(),
+            medico_id: selectedDoctorId,
+            horario_id: selectedSlot.id,
+            tipo_cita: 'especializacion' // <--- IMPORTANTE
+        };
+  
+        const response = await fetch('api/create_appointment.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(appointmentData)
+        });
+  
+        const result = await response.json();
+  
+        if (result.success) {
+            if (window.notificationManager) window.notificationManager.showToast('¡Cita de especialización agendada!', 'success');
+            if (window.notifyNewAppointment) window.notifyNewAppointment();
+            
+            const modalEl = document.getElementById('confirmModal');
+            if (modalEl) new bootstrap.Modal(modalEl).show();
+        } else {
+            alert('Error al agendar: ' + (result.message || JSON.stringify(result)));
+        }
       }
 
-      if (result.success) {
-    // Mostrar notificación toast
-    if (window.notificationManager) {
-        window.notificationManager.showToast('¡Cita agendada exitosamente!', 'success');
-    }
-    
-    // Forzar recarga de notificaciones
-    if (window.loadNotifications) {
-        setTimeout(() => {
-            window.loadNotifications();
-        }, 1000);
-    }
-    
-    const modalEl = document.getElementById('confirmModal');
-    if (modalEl) new bootstrap.Modal(modalEl).show();
-}
     } catch (error) {
       console.error('Error:', error);
       alert('Error al conectar con el servidor');
@@ -535,6 +585,10 @@ function renderSchedule() {
 
   // ==== inicialización ====
   renderCalendar(currentMonth);
-  renderDoctors('', false); // NO mostrar lista hasta que usuario presione "Buscar"
+  if (datosReprogramar) {
+    loadDoctors('');   // Si es reprogramación, cargar doctores automáticamente
+  } else {
+    renderDoctors('', false); // NO mostrar lista hasta que usuario presione "Buscar"
+  }
   updateStep2State();
 });

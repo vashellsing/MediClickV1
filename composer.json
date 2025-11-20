@@ -1,0 +1,13 @@
+{
+    "name": "mediclick/sistema-citas",
+    "description": "Sistema de agendamiento de citas médicas",
+    "type": "project",
+    "require": {
+        "phpmailer/phpmailer": "^6.8"
+    },
+    "autoload": {
+        "psr-4": {
+            "MediClick\\": "src/"
+        }
+    }
+}

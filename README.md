@@ -6,7 +6,7 @@ Hola gente, si leen esto, pregunten cosas que no entiendan, para ir acomodando p
 
 si en un futuro se necesita funcional de los dos usuarios 
 /* ===========================
-   🔑 PROCESAR LOGIN REAL
+   🔑 PROCESAR
 =========================== */
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $page === 'login') {
     $email = trim($_POST['email'] ?? '');
