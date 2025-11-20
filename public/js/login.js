@@ -11,13 +11,11 @@
   // Toggle password (añadimos listener al botón)
   if (toggleBtn && passwordInput) {
     toggleBtn.addEventListener('click', () => {
-      if (passwordInput.type === 'password') {
-        passwordInput.type = 'text';
-        toggleBtn.setAttribute('aria-pressed', 'true');
-      } else {
-        passwordInput.type = 'password';
-        toggleBtn.setAttribute('aria-pressed', 'false');
-      }
+      const isHidden = passwordInput.type === 'password';
+      passwordInput.type = isHidden ? 'text' : 'password';
+      toggleBtn.textContent = isHidden ? '🙈' : '👁';
+      toggleBtn.setAttribute('aria-pressed', isHidden ? 'true' : 'false');
+      toggleBtn.setAttribute('title', isHidden ? 'Ocultar contraseña' : 'Mostrar contraseña');
     });
   }
 

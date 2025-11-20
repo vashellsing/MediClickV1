@@ -15,72 +15,38 @@ if (!isset($_SESSION['usuario'])) {
     <div class="card-body">
       <p class="text-muted mb-4">Aquí puedes ver tus citas pasadas y futuras, con la posibilidad de reprogramarlas o cancelarlas si están pendientes.</p>
       
-      <div class="table-responsive">
-        <table class="table table-hover align-middle">
-          <thead class="table-primary text-center">
-            <tr>
-              <th scope="col">Fecha</th>
-              <th scope="col">Tipo de Cita</th>
-              <th scope="col">Médico</th>
-              <th scope="col">Hora</th>
-              <th scope="col">Estado</th>
-              <th scope="col">Acciones</th>  
-            </tr>
-          </thead>
-          <tbody class="text-center">
-            <tr>
-              <td>30/10/2025</td>
-              <td>General</td>
-              <td>Dra. María López</td>
-              <td>15:00</td>
-              <td><span class="badge bg-primary badge-fixed">Agendada</span></td>
-              <td>
-                <a href="index.php?page=agenda_general" class="btn btn-outline-primary btn-sm">Reprogramar</a> 
-                <!-- type="button" agregado -->
-                <button type="button" class="btn btn-outline-danger btn-sm cancelar-btn">Cancelar</button>
-              </td>
-            </tr>
+      <!-- Loading state -->
+      <div id="loadingHistorial" class="text-center py-4">
+        <div class="spinner-border text-primary" role="status">
+          <span class="visually-hidden">Cargando...</span>
+        </div>
+        <p class="mt-2">Cargando historial de citas...</p>
+      </div>
 
-            <tr>
-              <td>30/10/2025</td>
-              <td>Pediatria</td>
-              <td>Dra. Juana Campos</td>
-              <td>16:00</td>
-              <td><span class="badge bg-primary badge-fixed">Agendada</span></td>
-              <td>
-                <a href="index.php?page=agenda_general" class="btn btn-outline-primary btn-sm">Reprogramar</a> 
-                <button type="button" class="btn btn-outline-danger btn-sm cancelar-btn">Cancelar</button>
-              </td>
-            </tr>
-
-            <tr>
-              <td>15/10/2025</td>
-              <td>General</td>
-              <td>Dra. María López</td>
-              <td>15:00</td>
-              <td><span class="badge bg-info text-dark badge-fixed">Reprogramada</span></td>
-              <td>—</td>
-            </tr>
-
-            <tr>
-              <td>06/10/2025</td>
-              <td>Odontología</td>
-              <td>Dra. Ana Torres</td>
-              <td>07:40</td>
-              <td><span class="badge bg-danger badge-fixed">Cancelada</span></td>
-              <td>—</td>
-            </tr>
-
-            <tr>
-              <td>08/10/2025</td>
-              <td>General</td>
-              <td>Dr. Carlos Ramírez</td>
-              <td>10:30</td>
-              <td><span class="badge bg-success badge-fixed">Completada</span></td>
-              <td>—</td>
-            </tr>
-          </tbody>
-        </table>
+      <div id="historialContent" style="display: none;">
+        <div class="table-responsive">
+          <table class="table table-hover align-middle">
+            <thead class="table-primary text-center">
+              <tr>
+                <th scope="col">Fecha</th>
+                <th scope="col">Tipo de Cita</th>
+                <th scope="col">Médico</th>
+                <th scope="col">Hora</th>
+                <th scope="col">Estado</th>
+                <th scope="col">Acciones</th>  
+              </tr>
+            </thead>
+            <tbody class="text-center" id="historialBody">
+              <!-- Los datos se cargarán via JavaScript -->
+            </tbody>
+          </table>
+        </div>
+        
+        <!-- Empty state -->
+        <div id="emptyHistorial" class="text-center py-4" style="display: none;">
+          <p class="text-muted mb-3">No tienes citas agendadas.</p>
+          <a href="index.php?page=agenda_especializacion" class="btn btn-primary">Agendar primera cita</a>
+        </div>
       </div>
     </div>
   </div>
@@ -97,13 +63,15 @@ if (!isset($_SESSION['usuario'])) {
       </div>
       <div class="modal-body">
         <p class="mb-1">¿Estás seguro de que deseas <strong>cancelar esta cita médica</strong>?</p>
-        <p class="small text-muted mb-0">Al confirmar, la cita pasará a estado <em>Cancelada</em> (simulación).</p>
+        <p class="small text-muted mb-0">Al confirmar, la cita pasará a estado <em>Cancelada</em>.</p>
+        <input type="hidden" id="citaIdToCancel">
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">No</button>
-        <!-- type="button" por seguridad -->
         <button type="button" class="btn btn-danger" id="confirmarCancelar">Sí, cancelar</button>
       </div>
     </div>
   </div>
 </div>
+
+<script src="public/js/historial.js"></script>

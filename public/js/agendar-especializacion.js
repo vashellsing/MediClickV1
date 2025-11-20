@@ -1,6 +1,14 @@
-// public/js/agendar-especializacion.js
+// public/js/agendar-especializacion.js - CONEXIÓN BD (versión lista para pegar)
 document.addEventListener('DOMContentLoaded', () => {
-  console.log('agendar-especializacion.js cargado');
+  console.log('agendar-especializacion.js cargado - CON BD');
+
+  let citaReprogramarId = null;
+  const datosReprogramar = sessionStorage.getItem('citaReprogramar');
+  if (datosReprogramar) {
+    const citaData = JSON.parse(datosReprogramar);
+    citaReprogramarId = citaData.id;
+    console.log('Modo reprogramación activado para cita:', citaReprogramarId);
+  }
 
   // ----- referencias DOM -----
   const calendarGrid = document.getElementById('calendarGrid');
@@ -29,39 +37,19 @@ document.addEventListener('DOMContentLoaded', () => {
   const confirmDoctorIdInput = document.getElementById('confirmDoctorId');
 
   // ----- estado -----
-  // selectedDoctorId: undefined = usuario no eligió nada (aún no buscó o no eligió);
-  // null = "Sin preferencia"; number = id del doctor seleccionado
-  let selectedDate = null;      
-  let selectedDoctorId = undefined;  
-  let selectedSlot = null;      
-  let selectedSpecialization = ''; // valor del select (ej. 'neurologia')
+  let selectedDate = null;
+  let selectedDoctorId = undefined;
+  let selectedSlot = null; // {id: number, hora: "HH:MM:SS"}
+  let selectedSpecialization = '';
 
-  // ----- datos de ejemplo (médicos) -----
-  const doctors = [
-    { id: 1, name: 'Dra. Laura Méndez', speciality: 'neurologia' },
-    { id: 2, name: 'Dr. Juan Gomez', speciality: 'neurologia' },
-    { id: 2, name: 'Dr. Carlos Ruiz', speciality: 'pediatria' },
-    { id: 3, name: 'Dr. Enrique Chocue', speciality: 'pediatria' },
-    { id: 3, name: 'Dra. Natalia Gómez', speciality: 'odontologia' },
-    { id: 4, name: 'Dra. Sofía Prado', speciality: 'odontologia' },
-    { id: 5, name: 'Dr. Andrés Pérez', speciality: 'dermatologia' },
-    { id: 6, name: 'Dr. Melisa Muñoz', speciality: 'dermatologia' },
-    { id: 7, name: 'Dr. Dana Estrada', speciality: 'cardiologia' },
-    { id: 8, name: 'Dr. Dayna Restrepo', speciality: 'cardiologia' }
-  ];
+  // ----- datos desde BD -----
+  let doctors = [];
+  let availableSlots = [];
 
   // ==== utilidades ====
   function pad2(n){ return String(n).padStart(2,'0'); }
   function formatDateISO(d){
     return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;
-  }
-
-  // Determinista: marca algunos slots como ocupados según fecha+doctor+slot
-  function isOccupiedDeterministic(dateISO, doctorId, totalMins){
-    const key = `${dateISO}|${doctorId ?? 'any'}|${totalMins}`;
-    let sum = 0;
-    for (let i=0;i<key.length;i++) sum = (sum + key.charCodeAt(i) * (i+1)) % 97;
-    return (sum % 4) === 0;
   }
 
   // ==== calendario ====
@@ -77,7 +65,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const lastDate = new Date(year, month + 1, 0).getDate();
 
     currentMonthLabel.textContent = date.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
-
+    if (datosReprogramar && !selectedDate) {
+    const citaData = JSON.parse(datosReprogramar);
+    if (citaData.fechaOriginal) {
+      const fechaOriginal = new Date(citaData.fechaOriginal);
+      if (fechaOriginal.getFullYear() === year && fechaOriginal.getMonth() === month) {
+        selectedDate = fechaOriginal;
+      }
+    }
+  }
     const startOffset = (firstDay.getDay() + 6) % 7; // lunes = 0
     const grid = document.createElement('div');
     grid.className = 'calendar-grid d-grid gap-2';
@@ -97,17 +93,19 @@ document.addEventListener('DOMContentLoaded', () => {
         btn.classList.add('fw-bold', 'border-primary');
       }
 
-      // deshabilitar fechas anteriores
       if (cellDate.getTime() < todayStart.getTime()) {
         btn.disabled = true;
         btn.classList.add('text-muted');
       } else {
-        btn.addEventListener('click', () => {
+        btn.addEventListener('click', async () => {
           selectedDate = cellDate;
           // visual calendario
           grid.querySelectorAll('button').forEach(b => b.classList.remove('btn-primary', 'text-white'));
           btn.classList.add('btn-primary', 'text-white');
           selectedSlot = null;
+
+          // Cargar horarios disponibles desde BD
+          await loadAvailableSlots();
           renderSchedule();
           updateStep2State();
         });
@@ -145,7 +143,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     // botón confirmar
     if (confirmBtn) confirmBtn.disabled = !ready;
-    // botón continuar habilitado si hay fecha y slot (doctor puede venir después como "Sin preferencia")
+    // botón continuar habilitado si hay fecha y slot
     if (continueBtn) continueBtn.disabled = !((selectedDate !== null) && (selectedSlot !== null));
   }
 
@@ -163,14 +161,53 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // ==== doctores / búsqueda ====
-  function getFilteredDoctors(filter = '') {
-    const q = (filter||'').trim().toLowerCase();
-    // si hay especialidad seleccionada, filtrar por ella
-    const bySpec = selectedSpecialization ? doctors.filter(d => d.speciality === selectedSpecialization) : doctors.slice();
-    return (q === '') ? bySpec : bySpec.filter(d => d.name.toLowerCase().includes(q) || d.speciality.toLowerCase().includes(q));
-  }
+  // ==== doctores / búsqueda (CONEXIÓN BD) ====
+  async function loadDoctors(filter = '') {
+    try {
+      // Llamamos a tu endpoint real get_medicos.php con id_especialidad
+      const esp = selectedSpecialization ? `?id_especialidad=${getEspecialidadId(selectedSpecialization)}` : '';
+      const filterParam = filter ? `&filter=${encodeURIComponent(filter)}` : '';
+      const url = `api/get_medicos.php${esp}${filter && !esp ? `?filter=${encodeURIComponent(filter)}` : filterParam}`;
 
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Error al cargar médicos');
+      const data = await response.json();
+
+      // Normalizar y soportar varias formas de respuesta
+      doctors = (Array.isArray(data) ? data : []).map(item => {
+        const id = item.id_medico ?? item.id ?? item.id_doctor ?? item.idMedico;
+        const nombre_full = item.nombre_medico ?? ((item.nombre || '') + (item.apellido ? ' ' + item.apellido : '')).trim();
+        const [nombre, ...rest] = (nombre_full || '').split(' ');
+        const apellido = rest.join(' ');
+        return {
+          id: id,
+          id_medico: id,
+          nombre: nombre_full || item.nombre || '',
+          nombre_separado: nombre || '',
+          apellido: item.apellido ?? apellido ?? '',
+          descripcion_especialidad: item.descripcion_especialidad ?? item.nombre_especialidad ?? '',
+          id_especialidad: item.id_especialidad ?? item.idEspecialidad ?? item.especialidad ?? ''
+        };
+      });
+
+      // mostrar resultados inmediatamente
+      renderDoctors(filter, true);
+    } catch (error) {
+      console.error('Error cargando médicos:', error);
+      doctorListEl.innerHTML = '<div class="text-danger">Error cargando médicos</div>';
+      doctors = [];
+    }
+  }
+  function getEspecialidadId(nombreEspecialidad) {
+    const map = {
+        'neurologia': 1,
+        'pediatria': 2, 
+        'odontologia': 3,
+        'dermatologia': 4,
+        'cardiologia': 5
+    };
+    return map[nombreEspecialidad] || nombreEspecialidad;
+  }
   function highlightSelectedDoctor() {
     doctorListEl.querySelectorAll('.list-group-item').forEach(x => {
       x.classList.remove('active','bg-primary','text-white');
@@ -191,25 +228,39 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!showResults) {
       const hint = document.createElement('div');
       hint.className = 'text-muted small';
-      hint.textContent = selectedSpecialization ? `Presione 'Buscar' para ver profesionales (filtrando por ${specializationSelect.options[specializationSelect.selectedIndex].text}).` 
-                                                : "Presione 'Buscar' para ver profesionales.";
+      hint.textContent = selectedSpecialization ?
+        `Presione 'Buscar' para ver profesionales (filtrando por ${specializationSelect.options[specializationSelect.selectedIndex]?.text || selectedSpecialization}).` :
+        "Seleccione una especialización y presione 'Buscar' para ver profesionales.";
       doctorListEl.appendChild(hint);
       return;
     }
 
-    const filtered = getFilteredDoctors(filter);
+    if (datosReprogramar && !filter) {
+      const citaData = JSON.parse(datosReprogramar);
+      if (citaData.medicoId) {
+        selectedDoctorId = citaData.medicoId;
+        console.log('Médico preseleccionado para reprogramación:', selectedDoctorId);
+      }
+    }
+
+    const q = (filter||'').trim().toLowerCase();
+    const filtered = (q === '') ? doctors.slice() : doctors.filter(d =>
+      (d.nombre || '').toLowerCase().includes(q) ||
+      (d.apellido || '').toLowerCase().includes(q) ||
+      (d.descripcion_especialidad || '').toLowerCase().includes(q)
+    );
 
     // Opción "Sin preferencia"
     const anyItem = document.createElement('button');
     anyItem.type = 'button';
     anyItem.className = 'list-group-item list-group-item-action d-flex justify-content-between align-items-start';
     anyItem.dataset.doctorId = 'any';
-    anyItem.innerHTML = `<div><strong>Sin preferencia</strong><div class="small text-muted">Asignar cualquier profesional disponible${selectedSpecialization ? ' de la especialidad seleccionada' : ''}</div></div><div class="small text-muted">ID any</div>`;
+    anyItem.innerHTML = `<div><strong>Sin preferencia</strong><div class="small text-muted">Asignar cualquier profesional disponible${selectedSpecialization ? ' de la especialidad seleccionada' : ''}</div></div>`;
     anyItem.addEventListener('click', () => {
       selectedDoctorId = null; // "Sin preferencia"
       selectedSlot = null;
       highlightSelectedDoctor();
-      renderSchedule();
+      loadAvailableSlots();
       updateStep2State();
     });
     doctorListEl.appendChild(anyItem);
@@ -227,13 +278,13 @@ document.addEventListener('DOMContentLoaded', () => {
       btn.type = 'button';
       btn.className = 'list-group-item list-group-item-action d-flex justify-content-between align-items-start';
       btn.dataset.doctorId = d.id;
-      btn.innerHTML = `<div><strong>${d.name}</strong><div class="small text-muted">${d.speciality}</div></div><div class="small text-muted">ID ${d.id}</div>`;
+      btn.innerHTML = `<div><strong>Dr. ${d.nombre}</strong><div class="small text-muted">${d.descripcion_especialidad || ''}</div></div>`;
 
       btn.addEventListener('click', () => {
         selectedDoctorId = d.id;
         highlightSelectedDoctor();
         selectedSlot = null;
-        renderSchedule();
+        loadAvailableSlots();
         updateStep2State();
       });
 
@@ -245,138 +296,165 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // eventos de búsqueda
   btnDoctorSearch?.addEventListener('click', () => {
-    const val = (doctorSearchInput.value || '').trim();
-    renderDoctors(val, true);
-  });
-  doctorSearchInput?.addEventListener('keyup', (e) => { if (e.key === 'Enter') {
-    const val = (doctorSearchInput.value || '').trim();
-    renderDoctors(val, true);
-  }});
-
-  // Omitir -> seleccionar "Sin preferencia" y mostrar la lista (para que se vea la opción)
-  omitDoctorBtn?.addEventListener('click', () => {
-    selectedDoctorId = null;
-    selectedSlot = null;
-    renderDoctors(doctorSearchInput.value || '', true);
-    highlightSelectedDoctor();
-    renderSchedule();
-    updateStep2State();
-  });
-
-  // cuando cambie la especialidad, actualizamos variable y limpiamos selección de doctor
-  specializationSelect?.addEventListener('change', () => {
-    selectedSpecialization = specializationSelect.value || '';
-    // Limpiar selección previa de doctor (el usuario deberá volver a buscar/seleccionar)
-    selectedDoctorId = undefined;
-    selectedSlot = null;
-    renderDoctors(doctorSearchInput.value || '', false); // no mostrar resultados automáticamente
-    renderSchedule();
-    updateStep2State();
-  });
-
-  // ==== horarios (cada 20 minutos) ====
-  function renderSchedule(){
-    scheduleGrid.innerHTML = '';
-
-    if (!selectedDate){
-      scheduleGrid.innerHTML = '<div class="text-muted small">Seleccione primero un día.</div>';
+    if (!selectedSpecialization) {
+      alert('Por favor seleccione una especialización primero.');
       return;
     }
+    const val = (doctorSearchInput.value || '').trim();
+    loadDoctors(val);
+  });
 
-    // si no hay selección de doctor (undefined), pedir que busque o elija "Sin preferencia"
-    if (selectedDoctorId === undefined){
-      scheduleGrid.innerHTML = '<div class="text-muted small">Seleccione primero un médico (presione Buscar) o elija "Sin preferencia".</div>';
+  doctorSearchInput?.addEventListener('keyup', (e) => {
+    if (e.key === 'Enter') {
+      if (!selectedSpecialization) {
+        alert('Por favor seleccione una especialización primero.');
+        return;
+      }
+      const val = (doctorSearchInput.value || '').trim();
+      loadDoctors(val);
+    }
+  });
+
+  // Omitir -> seleccionar "Sin preferencia"
+  omitDoctorBtn?.addEventListener('click', () => {
+    if (!selectedSpecialization) {
+      alert('Por favor seleccione una especialización primero.');
+      return;
+    }
+    selectedDoctorId = null;
+    selectedSlot = null;
+    loadDoctors(doctorSearchInput.value || '');
+    highlightSelectedDoctor();
+    loadAvailableSlots();
+    updateStep2State();
+  });
+
+  // cuando cambie la especialidad
+  specializationSelect?.addEventListener('change', () => {
+    selectedSpecialization = specializationSelect.value || '';
+    // Limpiar selecciones previas
+    selectedDoctorId = undefined;
+    selectedSlot = null;
+    doctors = [];
+    renderDoctors(doctorSearchInput.value || '', false);
+    loadAvailableSlots();
+    updateStep2State();
+  });
+
+  // ==== horarios (CONEXIÓN BD) ====
+  async function loadAvailableSlots() {
+    if (!selectedDate) {
+      scheduleGrid.innerHTML = '<div class="text-muted small">Seleccione primero un día.</div>';
+      availableSlots = [];
       return;
     }
 
     const dateISO = formatDateISO(selectedDate);
-    const start = 8*60;
-    const end = 17*60;
-    const fragment = document.createDocumentFragment();
 
-    // función para obtener lista de doctores a considerar según la especialidad
-    const candidateDoctors = selectedSpecialization ? doctors.filter(d => d.speciality === selectedSpecialization) : doctors.slice();
-
-    for (let t = start; t <= end; t += 20){
-      const h = Math.floor(t/60);
-      const m = t%60;
-      const timeLabel = `${pad2(h)}:${pad2(m)}`;
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.textContent = timeLabel;
-      btn.style.minWidth = '90px';
-      btn.className = 'btn btn-sm m-1';
-
-      if (selectedDoctorId === null) {
-        // Sin preferencia: disponible si al menos un profesional en la especialidad está libre
-        const anyAvailable = candidateDoctors.some(d => !isOccupiedDeterministic(dateISO, d.id, t));
-        if (!anyAvailable) {
-          btn.classList.add('btn-danger');
-          btn.disabled = true;
-        } else {
-          btn.classList.add('btn-outline-success');
-          btn.addEventListener('click', () => {
-            // asignar automaticamente el primer doctor libre dentro de la especialidad (o en general si no hay especialidad)
-            const assigned = candidateDoctors.find(d => !isOccupiedDeterministic(dateISO, d.id, t));
-            if (assigned) {
-              selectedDoctorId = assigned.id;
-              highlightSelectedDoctor();
-            }
-            // marcar seleccionado
-            scheduleGrid.querySelectorAll('button').forEach(b => {
-              if (!b.disabled) {
-                b.classList.remove('btn-primary');
-                b.classList.remove('btn-success');
-                if (!b.classList.contains('btn-outline-success')) b.classList.add('btn-outline-success');
-              }
-            });
-            btn.classList.remove('btn-outline-success');
-            btn.classList.add('btn-primary');
-            selectedSlot = timeLabel;
-            updateStep2State();
-          });
-        }
-      } else {
-        // doctor específico
-        const occupied = isOccupiedDeterministic(dateISO, selectedDoctorId, t);
-        if (occupied){
-          btn.classList.add('btn-danger');
-          btn.disabled = true;
-        } else {
-          btn.classList.add('btn-outline-success');
-          btn.addEventListener('click', () => {
-            scheduleGrid.querySelectorAll('button').forEach(b => {
-              if (!b.disabled) {
-                b.classList.remove('btn-primary');
-                b.classList.remove('btn-success');
-                if (!b.classList.contains('btn-outline-success')) b.classList.add('btn-outline-success');
-              }
-            });
-            btn.classList.remove('btn-outline-success');
-            btn.classList.add('btn-primary');
-            selectedSlot = timeLabel;
-            updateStep2State();
-          });
-        }
+    try {
+      let url = `api/get_horarios.php?fecha=${dateISO}&tipo=especializacion`;
+      if (selectedSpecialization) {
+        url += `&especialidad=${encodeURIComponent(selectedSpecialization)}`;
+      }
+      // enviamos id_medico si hay uno (o null -> no lo enviamos)
+      if (selectedDoctorId && selectedDoctorId !== null) {
+        url += `&id_medico=${encodeURIComponent(selectedDoctorId)}`;
       }
 
-      fragment.appendChild(btn);
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Error al cargar horarios');
+
+      availableSlots = await response.json();
+      // Esperamos array de slots: { id, hora, medico_id, ... }
+      renderSchedule();
+    } catch (error) {
+      console.error('Error cargando horarios:', error);
+      scheduleGrid.innerHTML = '<div class="text-danger">Error cargando horarios</div>';
+      availableSlots = [];
     }
+  }
+
+function renderSchedule() {
+    scheduleGrid.innerHTML = '';
+
+    if (!selectedDate) {
+        scheduleGrid.innerHTML = '<div class="text-muted small">Seleccione primero un día.</div>';
+        return;
+    }
+
+    if (!selectedSpecialization) {
+        scheduleGrid.innerHTML = '<div class="text-muted small">Seleccione una especialización primero.</div>';
+        return;
+    }
+
+    if (selectedDoctorId === undefined) {
+        scheduleGrid.innerHTML = '<div class="text-muted small">Seleccione primero un médico (presione Buscar) o elija "Sin preferencia".</div>';
+        return;
+    }
+
+    if (!Array.isArray(availableSlots) || availableSlots.length === 0) {
+        scheduleGrid.innerHTML = '<div class="text-muted small">No hay horarios disponibles para esta fecha.</div>';
+        return;
+    }
+
+    // Filtrar horarios únicos por hora_inicio
+    const horariosUnicos = [];
+    const horasVistas = new Set();
+    
+    availableSlots.forEach(slot => {
+        const hora = slot.hora || slot.hora_inicio;
+        const horaKey = hora.substring(0, 5); // "HH:MM"
+        
+        if (!horasVistas.has(horaKey)) {
+            horasVistas.add(horaKey);
+            horariosUnicos.push(slot);
+        }
+    });
+
+    const fragment = document.createDocumentFragment();
+
+    horariosUnicos.forEach(slot => {
+        const timeLabel = (slot.hora || slot.hora_inicio || '').substring(0, 5); // HH:MM
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = timeLabel;
+        btn.style.minWidth = '80px';
+        btn.className = 'btn btn-sm m-1 btn-outline-success';
+        btn.dataset.slotId = slot.id;
+
+        btn.addEventListener('click', () => {
+            scheduleGrid.querySelectorAll('button').forEach(b => {
+                b.classList.remove('btn-primary');
+                b.classList.add('btn-outline-success');
+            });
+            btn.classList.remove('btn-outline-success');
+            btn.classList.add('btn-primary');
+            selectedSlot = { 
+                id: slot.id, 
+                hora: slot.hora || slot.hora_inicio,
+                medico_id: slot.id_medico || slot.medico_id
+            };
+            updateStep2State();
+        });
+
+        fragment.appendChild(btn);
+    });
 
     scheduleGrid.appendChild(fragment);
 
-    // restaurar slot seleccionado si sigue existiendo
-    if (selectedSlot){
-      const exists = Array.from(scheduleGrid.querySelectorAll('button')).find(b => !b.disabled && b.textContent === selectedSlot);
-      if (exists){
-        exists.classList.remove('btn-outline-success');
-        exists.classList.add('btn-primary');
-      } else {
-        selectedSlot = null;
-        updateStep2State();
-      }
+    // Restaurar selección si existe
+    if (selectedSlot) {
+        const exists = Array.from(scheduleGrid.querySelectorAll('button'))
+            .find(b => parseInt(b.dataset.slotId) === Number(selectedSlot.id));
+        if (exists) {
+            exists.classList.remove('btn-outline-success');
+            exists.classList.add('btn-primary');
+        } else {
+            selectedSlot = null;
+            updateStep2State();
+        }
     }
-  }
+}
 
   // ==== confirmación y navegación ====
   continueBtn?.addEventListener('click', () => {
@@ -385,23 +463,25 @@ document.addEventListener('DOMContentLoaded', () => {
     if (selStart.getTime() < todayStart.getTime()) return alert('No puede agendar una fecha anterior a hoy.');
     if (!selectedSlot) return alert('Seleccione un horario.');
     if (selectedDoctorId === undefined) return alert('Seleccione un médico o presione "Sin preferencia".');
+    if (!selectedSpecialization) return alert('Seleccione una especialización.');
 
-    // si sin preferencia, intentamos asignar ahora (si no se asignó en el click)
+    // Para "Sin preferencia", encontrar un médico disponible en ese horario
     if (selectedDoctorId === null) {
-      const dateISO = formatDateISO(selectedDate);
-      const mins = parseInt(selectedSlot.split(':')[0],10)*60 + parseInt(selectedSlot.split(':')[1],10);
-      // candidatos según especialidad
-      const candidates = selectedSpecialization ? doctors.filter(d => d.speciality === selectedSpecialization) : doctors;
-      const assigned = candidates.find(d => !isOccupiedDeterministic(dateISO, d.id, mins));
-      if (assigned) selectedDoctorId = assigned.id;
-      else return alert('No hay profesionales disponibles en el horario seleccionado.');
+      const slot = availableSlots.find(s => Number(s.id) === Number(selectedSlot.id));
+      if (slot && slot.medico_id) {
+        selectedDoctorId = slot.medico_id;
+      } else {
+        return alert('No hay profesionales disponibles en el horario seleccionado.');
+      }
     }
 
     confirmDateInput.value = formatDateISO(selectedDate);
     confirmDoctorIdInput.value = selectedDoctorId;
-    confirmDoctorEl.textContent = doctors.find(d=>d.id===selectedDoctorId)?.name ?? 'Sin preferencia';
+
+    const doctor = doctors.find(d => Number(d.id) === Number(selectedDoctorId));
+    confirmDoctorEl.textContent = doctor ? `Dr. ${doctor.nombre} ${doctor.apellido || ''}` : 'Sin preferencia';
     confirmTypeEl.textContent = specializationSelect?.options[specializationSelect.selectedIndex]?.text ?? 'Especialización';
-    confirmScheduleEl.textContent = `${selectedDate.toLocaleDateString()} · ${selectedSlot}`;
+    confirmScheduleEl.textContent = `${selectedDate.toLocaleDateString()} · ${(selectedSlot.hora||'').substring(0,5)}`;
 
     if (step2TabTrigger && !step2TabTrigger.disabled) new bootstrap.Tab(step2TabTrigger).show();
   });
@@ -411,15 +491,104 @@ document.addEventListener('DOMContentLoaded', () => {
     if (step1) new bootstrap.Tab(step1).show();
   });
 
-  confirmBtn?.addEventListener('click', () => {
-    const modalEl = document.getElementById('confirmModal');
-    if (modalEl) new bootstrap.Modal(modalEl).show();
+  confirmBtn?.addEventListener('click', async () => {
+    // 1. Validaciones
+    if (!selectedDate || !selectedSlot || !selectedDoctorId || !selectedSpecialization) {
+        alert('Faltan datos para confirmar la cita.');
+        return;
+    }
+
+    try {
+      // === LÓGICA CENTRAL CORREGIDA ===
+
+      // CASO A: ES UNA REPROGRAMACIÓN
+      if (citaReprogramarId) {
+        console.log("Procesando Reprogramación de Especialización...");
+        
+        const reprogramData = {
+            cita_id: citaReprogramarId,
+            nuevo_horario_id: selectedSlot.id
+        };
+
+        // Llamada a la API atómica
+        const response = await fetch('api/reprogramar_cita.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(reprogramData)
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            sessionStorage.removeItem('citaReprogramar');
+            
+            if (window.notificationManager) window.notificationManager.showToast('¡Cita reprogramada exitosamente!', 'success');
+            if (window.notifyNewAppointment) window.notifyNewAppointment();
+
+            const modalEl = document.getElementById('confirmModal');
+            if (modalEl) new bootstrap.Modal(modalEl).show();
+        } else {
+            alert('Error al reprogramar: ' + (result.message || result.error));
+        }
+
+      } 
+      // CASO B: ES UNA CITA NUEVA DE ESPECIALIZACIÓN
+      else {
+        console.log("Procesando Cita Nueva Especialización...");
+        
+        const appointmentData = {
+            paciente_id: await getPacienteId(),
+            medico_id: selectedDoctorId,
+            horario_id: selectedSlot.id,
+            tipo_cita: 'especializacion' // <--- IMPORTANTE
+        };
+  
+        const response = await fetch('api/create_appointment.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(appointmentData)
+        });
+  
+        const result = await response.json();
+  
+        if (result.success) {
+            if (window.notificationManager) window.notificationManager.showToast('¡Cita de especialización agendada!', 'success');
+            if (window.notifyNewAppointment) window.notifyNewAppointment();
+            
+            const modalEl = document.getElementById('confirmModal');
+            if (modalEl) new bootstrap.Modal(modalEl).show();
+        } else {
+            alert('Error al agendar: ' + (result.message || JSON.stringify(result)));
+        }
+      }
+
+    } catch (error) {
+      console.error('Error:', error);
+      alert('Error al conectar con el servidor');
+    }
   });
+
+  // ==== función auxiliar para obtener ID del paciente ====
+  async function getPacienteId() {
+    if (typeof currentPacienteId !== 'undefined') {
+      return currentPacienteId;
+    }
+    try {
+      const response = await fetch('api/get_current_patient.php');
+      const data = await response.json();
+      return data.paciente_id;
+    } catch (error) {
+      console.error('Error obteniendo ID del paciente:', error);
+      return 1; // Fallback para testing
+    }
+  }
 
   // ==== inicialización ====
   renderCalendar(currentMonth);
-  // NO mostramos lista de doctores hasta que el usuario pulse Buscar
-  renderDoctors('', false);
-  renderSchedule();
+  if (datosReprogramar) {
+    loadDoctors('');   // Si es reprogramación, cargar doctores automáticamente
+  } else {
+    renderDoctors('', false); // NO mostrar lista hasta que usuario presione "Buscar"
+  }
   updateStep2State();
 });
